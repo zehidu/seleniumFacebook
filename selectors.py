@@ -1,0 +1,31 @@
+from __future__ import annotations
+
+from selenium.webdriver.common.by import By
+
+# These are based on the HTML you provided for the Facebook login form.
+# Keep selectors stable (prefer id/name/data-testid) and avoid brittle classes.
+
+LOGIN_FORM = [
+    (By.CSS_SELECTOR, "form[data-testid='royal_login_form']"),
+    (By.CSS_SELECTOR, "form[data-testid='royal_login_form'] input#email"),
+    (By.ID, "login_form"),  # sometimes used on /login.php
+]
+
+EMAIL_INPUT = [
+    (By.ID, "email"),
+    (By.CSS_SELECTOR, "input[data-testid='royal-email']"),
+    (By.CSS_SELECTOR, "input[name='email']"),
+]
+
+PASSWORD_INPUT = [
+    (By.ID, "pass"),
+    (By.CSS_SELECTOR, "input[data-testid='royal-pass']"),
+    (By.CSS_SELECTOR, "input[name='pass']"),
+]
+
+LOGIN_SUBMIT = [
+    (By.CSS_SELECTOR, "button[data-testid='royal-login-button']"),
+    (By.CSS_SELECTOR, "button[name='login'][type='submit']"),
+    (By.ID, "loginbutton"),  # sometimes used on /login.php
+]
+

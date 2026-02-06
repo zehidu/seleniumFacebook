@@ -1,0 +1,4 @@
+# Copy to `config_local.py` (this file is gitignored) and set your credentials.
+FB_EMAIL = ""
+FB_PASSWORD = ""
+
