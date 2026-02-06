@@ -66,6 +66,9 @@ python run_login.py --prompt
 - After the menu opens, the script clicks **Marketplace** by default.
   - Disable with `--no-open-marketplace`.
   - If your UI language is not English, set `--marketplace-label`.
+- After Marketplace loads, the script clicks **Create new listing** by default.
+  - Disable with `--no-open-create-listing`.
+  - If your UI language is not English, set `--create-listing-label`.
 - If you have an old `chromedriver` in your system `PATH`, it can break runs with a `SessionNotCreatedException` due to version mismatch.
   - On Windows, this project hides any `chromedriver.exe` found in `PATH` by default so Selenium Manager can fetch the right version.
   - Set `SELENIUMFB_USE_PATH_CHROMEDRIVER=1` to force using the `PATH` driver.

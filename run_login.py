@@ -280,7 +280,52 @@ def click_marketplace(driver, *, label: str, timeout_s: float) -> bool:
                 except Exception:
                     break
 
-    return "/marketplace" in (driver.current_url or "")
+    # Fallback: if clicking fails (UI changes, intercepts), just navigate directly.
+    try:
+        driver.get("https://www.facebook.com/marketplace/")
+    except Exception:
+        pass
+    return wait_for_url_contains(driver, "/marketplace", timeout_s=10.0)
+
+
+def click_create_listing(driver, *, label: str, timeout_s: float) -> bool:
+    """Click 'Create new listing' on Marketplace."""
+    if "/marketplace/create" in (driver.current_url or ""):
+        return True
+
+    cl_locators: list[tuple[str, str]] = []
+    if label:
+        cl_locators.append((By.XPATH, f"//a[@aria-label={xpath_literal(label)}]"))
+        cl_locators.append((By.XPATH, f"//*[@role='link' and @aria-label={xpath_literal(label)}]"))
+        cl_locators.append((By.XPATH, f"//span[normalize-space()={xpath_literal(label)}]/ancestor::a[1]"))
+
+    cl_locators.extend(sel.CREATE_LISTING_ENTRY)
+
+    try:
+        cl_el = find_first(driver, cl_locators, timeout_s=timeout_s, require_displayed=True)
+    except RuntimeError:
+        cl_el = None
+
+    if cl_el is not None:
+        if safe_click(driver, cl_el) and wait_for_url_contains(driver, "/marketplace/create", timeout_s=10.0):
+            return True
+
+        # Fallback: try clicking ancestors if the <a> is wrapped or intercepted.
+        cur = cl_el
+        for _ in range(6):
+            if safe_click(driver, cur) and wait_for_url_contains(driver, "/marketplace/create", timeout_s=3.0):
+                return True
+            try:
+                cur = cur.find_element(By.XPATH, "..")
+            except Exception:
+                break
+
+    # Final fallback: navigate directly.
+    try:
+        driver.get("https://www.facebook.com/marketplace/create/")
+    except Exception:
+        pass
+    return wait_for_url_contains(driver, "/marketplace/create", timeout_s=10.0)
 
 
 def load_credentials(args) -> tuple[str, str]:
@@ -338,6 +383,17 @@ def main(argv: list[str]) -> int:
         default=30.0,
         help="Wait timeout for Marketplace entry after the menu is opened (seconds)",
     )
+    ap.add_argument(
+        "--create-listing-label",
+        default="Create new listing",
+        help="Visible label for Create Listing entry (locale dependent). Default: Create new listing",
+    )
+    ap.add_argument(
+        "--create-listing-timeout",
+        type=float,
+        default=30.0,
+        help="Wait timeout for Create Listing after Marketplace loads (seconds)",
+    )
     ap.add_argument("--email", help="Email/phone (prefer env var FB_EMAIL)")
     ap.add_argument(
         "--password",
@@ -374,6 +430,21 @@ def main(argv: list[str]) -> int:
         default=None,
         help="Do not click Marketplace",
     )
+    cl_group = ap.add_mutually_exclusive_group()
+    cl_group.add_argument(
+        "--open-create-listing",
+        dest="open_create_listing",
+        action="store_true",
+        default=None,
+        help="Click Create Listing after Marketplace loads (default)",
+    )
+    cl_group.add_argument(
+        "--no-open-create-listing",
+        dest="open_create_listing",
+        action="store_false",
+        default=None,
+        help="Do not click Create Listing",
+    )
     keep_group = ap.add_mutually_exclusive_group()
     keep_group.add_argument(
         "--keep-open",
@@ -403,6 +474,10 @@ def main(argv: list[str]) -> int:
     open_marketplace = args.open_marketplace
     if open_marketplace is None:
         open_marketplace = True
+
+    open_create_listing = args.open_create_listing
+    if open_create_listing is None:
+        open_create_listing = True
 
     email, password = load_credentials(args)
     if not email or not password:
@@ -463,6 +538,15 @@ def main(argv: list[str]) -> int:
                                 "Marketplace click did not navigate (selector mismatch or UI changed).",
                                 file=sys.stderr,
                             )
+
+                if open_create_listing:
+                    # Click "Create new listing" once Marketplace is loaded.
+                    if wait_for_url_contains(driver, "/marketplace", timeout_s=15.0) and "/marketplace/create" not in (
+                        driver.current_url or ""
+                    ):
+                        cl_label = (args.create_listing_label or "").strip()
+                        if not click_create_listing(driver, label=cl_label, timeout_s=args.create_listing_timeout):
+                            print("Create Listing entry not found on Marketplace.", file=sys.stderr)
 
         if args.screenshot_after:
             args.screenshot_after.parent.mkdir(parents=True, exist_ok=True)

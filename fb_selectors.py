@@ -47,3 +47,15 @@ MARKETPLACE_ENTRY = [
     # Fallback: locate by visible text.
     (By.XPATH, "//span[normalize-space()='Marketplace']/ancestor::*[self::a or @role='link' or @role='button'][1]"),
 ]
+
+CREATE_LISTING_ENTRY = [
+    # Prefer stable attributes.
+    (By.CSS_SELECTOR, "a[role='link'][href='/marketplace/create/']"),
+    (By.CSS_SELECTOR, "a[href='/marketplace/create/']"),
+    (By.CSS_SELECTOR, "a[href*='/marketplace/create']"),
+    (By.CSS_SELECTOR, "a[aria-label='Create new listing']"),
+    (By.CSS_SELECTOR, "[role='link'][aria-label='Create new listing']"),
+    (By.XPATH, "//a[contains(@href, '/marketplace/create')]"),
+    (By.XPATH, "//a[@aria-label='Create new listing']"),
+    (By.XPATH, "//span[normalize-space()='Create new listing']/ancestor::a[1]"),
+]
