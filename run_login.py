@@ -7,6 +7,7 @@ import os
 import sys
 import time
 from pathlib import Path
+from typing import Optional
 
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
@@ -20,7 +21,7 @@ import fb_selectors as sel
 def find_first(driver, locators: list[tuple[str, str]], timeout_s: float = 20.0):
     """Try multiple locators until one matches (polling)."""
     end = time.time() + timeout_s
-    last_exc: Exception | None = None
+    last_exc: Optional[Exception] = None
     while time.time() < end:
         for by, value in locators:
             try:
@@ -175,4 +176,3 @@ def main(argv: list[str]) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main(sys.argv[1:]))
-
