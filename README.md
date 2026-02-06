@@ -59,6 +59,10 @@ python run_login.py --prompt
 
 - By default, the script keeps the browser open after login when running non-headless (so you can inspect the next page).
   - Use `--auto-close` to exit automatically.
+- After login you may hit a checkpoint/robot detection page; solve it manually.
+  - The script waits for the logged-in home UI by looking for the top-bar Menu button (`aria-label="Menu"`).
+  - Adjust `--home-timeout` (seconds) or set `--home-timeout 0` to wait forever.
+  - If your Facebook UI language is not English, pass the translated label via `--menu-label`.
 - If you have an old `chromedriver` in your system `PATH`, it can break runs with a `SessionNotCreatedException` due to version mismatch.
   - On Windows, this project hides any `chromedriver.exe` found in `PATH` by default so Selenium Manager can fetch the right version.
   - Set `SELENIUMFB_USE_PATH_CHROMEDRIVER=1` to force using the `PATH` driver.

@@ -20,9 +20,9 @@ import fb_selectors as sel
 
 def find_first(driver, locators: list[tuple[str, str]], timeout_s: float = 20.0):
     """Try multiple locators until one matches (polling)."""
-    end = time.time() + timeout_s
+    end = None if timeout_s <= 0 else time.time() + timeout_s
     last_exc: Optional[Exception] = None
-    while time.time() < end:
+    while end is None or time.time() < end:
         for by, value in locators:
             try:
                 return driver.find_element(by, value)
@@ -30,6 +30,43 @@ def find_first(driver, locators: list[tuple[str, str]], timeout_s: float = 20.0)
                 last_exc = exc
         time.sleep(0.2)
     raise RuntimeError(f"Timed out finding any of: {locators}") from last_exc
+
+
+def xpath_literal(s: str) -> str:
+    # Safe quoting for XPath string literals.
+    if "'" not in s:
+        return f"'{s}'"
+    if '"' not in s:
+        return f'"{s}"'
+    parts = s.split("'")
+    expr_parts: list[str] = []
+    for i, part in enumerate(parts):
+        expr_parts.append(f"'{part}'")
+        if i != len(parts) - 1:
+            expr_parts.append("\"'\"")
+    return "concat(" + ", ".join(expr_parts) + ")"
+
+
+def safe_click(driver, el) -> bool:
+    try:
+        driver.execute_script(
+            "arguments[0].scrollIntoView({block: 'center', inline: 'center'});",
+            el,
+        )
+    except Exception:
+        pass
+
+    try:
+        el.click()
+        return True
+    except Exception:
+        pass
+
+    try:
+        driver.execute_script("arguments[0].click();", el)
+        return True
+    except Exception:
+        return False
 
 
 def click_cookie_banners(driver):
@@ -153,12 +190,38 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--headless", action="store_true", help="Run headless")
     ap.add_argument("--timeout", type=float, default=20.0, help="Element wait timeout (seconds)")
     ap.add_argument("--post-timeout", type=float, default=30.0, help="Post-login wait timeout (seconds)")
+    ap.add_argument(
+        "--home-timeout",
+        type=float,
+        default=300.0,
+        help="Wait for home UI to appear (menu button). 0 = wait forever",
+    )
+    ap.add_argument(
+        "--menu-label",
+        default="Menu",
+        help="aria-label for the home menu button (locale dependent). Default: Menu",
+    )
     ap.add_argument("--email", help="Email/phone (prefer env var FB_EMAIL)")
     ap.add_argument(
         "--password",
         help="Password (prefer env var FB_PASSWORD; passing via CLI is insecure)",
     )
     ap.add_argument("--prompt", action="store_true", help="Prompt for missing credentials")
+    menu_group = ap.add_mutually_exclusive_group()
+    menu_group.add_argument(
+        "--open-menu",
+        dest="open_menu",
+        action="store_true",
+        default=None,
+        help="Open the home Menu button after login (default)",
+    )
+    menu_group.add_argument(
+        "--no-open-menu",
+        dest="open_menu",
+        action="store_false",
+        default=None,
+        help="Do not click the home Menu button",
+    )
     keep_group = ap.add_mutually_exclusive_group()
     keep_group.add_argument(
         "--keep-open",
@@ -180,6 +243,10 @@ def main(argv: list[str]) -> int:
     keep_open = args.keep_open
     if keep_open is None:
         keep_open = not args.headless
+
+    open_menu = args.open_menu
+    if open_menu is None:
+        open_menu = True
 
     email, password = load_credentials(args)
     if not email or not password:
@@ -210,6 +277,26 @@ def main(argv: list[str]) -> int:
         pass_el.send_keys(Keys.ENTER)
 
         wait_for_post_login(driver, initial_url=initial_url, timeout_s=args.post_timeout)
+
+        # Manual checkpoint/CAPTCHA may appear after login. We just wait until the
+        # logged-in UI shows up (menu button), then optionally click it.
+        if open_menu:
+            label = (args.menu_label or "").strip()
+            menu_locators = []
+            if label:
+                menu_locators.append((By.XPATH, f"//*[@role='button' and @aria-label={xpath_literal(label)}]"))
+            menu_locators.extend(sel.HOME_MENU_BUTTON)
+
+            try:
+                menu_btn = find_first(driver, menu_locators, timeout_s=args.home_timeout)
+                expanded = (menu_btn.get_attribute("aria-expanded") or "").lower()
+                if expanded != "true":
+                    safe_click(driver, menu_btn)
+            except RuntimeError:
+                print(
+                    "Home menu button not found (still on checkpoint/robot detection?).",
+                    file=sys.stderr,
+                )
 
         if args.screenshot_after:
             args.screenshot_after.parent.mkdir(parents=True, exist_ok=True)

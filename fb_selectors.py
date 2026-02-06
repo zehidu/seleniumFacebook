@@ -29,3 +29,9 @@ LOGIN_SUBMIT = [
     (By.ID, "loginbutton"),  # sometimes used on /login.php
 ]
 
+# Logged-in home UI
+HOME_MENU_BUTTON = [
+    # This is the grid/menu button on the top bar after login (English locale).
+    (By.CSS_SELECTOR, "div[role='button'][aria-label='Menu']"),
+    (By.XPATH, "//*[@role='button' and @aria-label='Menu']"),
+]
