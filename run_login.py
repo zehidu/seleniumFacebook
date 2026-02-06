@@ -57,6 +57,34 @@ def click_cookie_banners(driver):
 
 
 def build_chrome(headless: bool):
+    # If a stale chromedriver.exe is present in PATH on Windows, Selenium Manager may
+    # pick it up and fail with "only supports Chrome version X". We hide any
+    # chromedriver found in PATH for this process so Selenium Manager can download
+    # a matching driver automatically.
+    if os.environ.get("SELENIUMFB_USE_PATH_CHROMEDRIVER", "").strip() not in {"1", "true", "TRUE", "yes", "YES"}:
+        exe = "chromedriver.exe" if os.name == "nt" else "chromedriver"
+        path_entries = [p for p in os.environ.get("PATH", "").split(os.pathsep) if p]
+        kept: list[str] = []
+        removed: list[str] = []
+        for entry in path_entries:
+            entry_clean = entry.strip().strip('"')
+            try:
+                if (Path(entry_clean) / exe).exists():
+                    removed.append(entry_clean)
+                    continue
+            except Exception:
+                # If the path entry is malformed/unreadable, keep it.
+                pass
+            kept.append(entry)
+
+        if removed:
+            os.environ["PATH"] = os.pathsep.join(kept)
+            print(
+                "Ignoring chromedriver found in PATH (will use Selenium Manager instead). "
+                "Set SELENIUMFB_USE_PATH_CHROMEDRIVER=1 to override.",
+                file=sys.stderr,
+            )
+
     opts = ChromeOptions()
     if headless:
         # Works on recent Chrome versions; if it fails, try "--headless" instead.
