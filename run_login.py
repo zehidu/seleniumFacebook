@@ -14,7 +14,7 @@ from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
-import selectors as sel
+import fb_selectors as sel
 
 
 def find_first(driver, locators: list[tuple[str, str]], timeout_s: float = 20.0):
