@@ -57,6 +57,8 @@ python run_login.py --prompt
 
 ## Notes
 
+- By default, the script keeps the browser open after login when running non-headless (so you can inspect the next page).
+  - Use `--auto-close` to exit automatically.
 - If you have an old `chromedriver` in your system `PATH`, it can break runs with a `SessionNotCreatedException` due to version mismatch.
   - On Windows, this project hides any `chromedriver.exe` found in `PATH` by default so Selenium Manager can fetch the right version.
   - Set `SELENIUMFB_USE_PATH_CHROMEDRIVER=1` to force using the `PATH` driver.

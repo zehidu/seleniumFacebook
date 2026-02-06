@@ -159,9 +159,27 @@ def main(argv: list[str]) -> int:
         help="Password (prefer env var FB_PASSWORD; passing via CLI is insecure)",
     )
     ap.add_argument("--prompt", action="store_true", help="Prompt for missing credentials")
-    ap.add_argument("--keep-open", action="store_true", help="Keep browser open until Enter is pressed")
+    keep_group = ap.add_mutually_exclusive_group()
+    keep_group.add_argument(
+        "--keep-open",
+        dest="keep_open",
+        action="store_true",
+        default=None,
+        help="Keep browser open until Enter is pressed (default when not headless)",
+    )
+    keep_group.add_argument(
+        "--auto-close",
+        dest="keep_open",
+        action="store_false",
+        default=None,
+        help="Close browser automatically when done (default when headless)",
+    )
     ap.add_argument("--screenshot-after", type=Path, help="Write a screenshot after login attempt")
     args = ap.parse_args(argv)
+
+    keep_open = args.keep_open
+    if keep_open is None:
+        keep_open = not args.headless
 
     email, password = load_credentials(args)
     if not email or not password:
@@ -199,7 +217,7 @@ def main(argv: list[str]) -> int:
 
         print(driver.current_url)
 
-        if args.keep_open:
+        if keep_open:
             input("Press Enter to close the browser...")
         return 0
     finally:
