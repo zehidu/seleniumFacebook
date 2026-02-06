@@ -58,7 +58,7 @@ python run_login.py --prompt
 ## Notes
 
 - If you have an old `chromedriver` in your system `PATH`, it can break runs with a `SessionNotCreatedException` due to version mismatch.
-  - This project hides any `chromedriver` found in `PATH` by default so Selenium Manager can fetch the right version.
+  - On Windows, this project hides any `chromedriver.exe` found in `PATH` by default so Selenium Manager can fetch the right version.
   - Set `SELENIUMFB_USE_PATH_CHROMEDRIVER=1` to force using the `PATH` driver.
 - You can also put credentials in a local file that is **gitignored**:
   - Copy `config_local.py.example` to `config_local.py` and set `FB_EMAIL` / `FB_PASSWORD`.

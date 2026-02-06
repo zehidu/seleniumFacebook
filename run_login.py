@@ -61,7 +61,11 @@ def build_chrome(headless: bool):
     # pick it up and fail with "only supports Chrome version X". We hide any
     # chromedriver found in PATH for this process so Selenium Manager can download
     # a matching driver automatically.
-    if os.environ.get("SELENIUMFB_USE_PATH_CHROMEDRIVER", "").strip() not in {"1", "true", "TRUE", "yes", "YES"}:
+    if (
+        os.name == "nt"
+        and os.environ.get("SELENIUMFB_USE_PATH_CHROMEDRIVER", "").strip()
+        not in {"1", "true", "TRUE", "yes", "YES"}
+    ):
         exe = "chromedriver.exe" if os.name == "nt" else "chromedriver"
         path_entries = [p for p in os.environ.get("PATH", "").split(os.pathsep) if p]
         kept: list[str] = []
