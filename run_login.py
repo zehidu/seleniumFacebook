@@ -69,6 +69,38 @@ def safe_click(driver, el) -> bool:
         return False
 
 
+def element_exists(driver, by: str, value: str) -> bool:
+    try:
+        driver.find_element(by, value)
+        return True
+    except NoSuchElementException:
+        return False
+    except Exception:
+        return False
+
+
+def wait_for_home_menu(driver, menu_locators: list[tuple[str, str]], timeout_s: float, give_up_login_page_after_s: float = 15.0):
+    """Wait for the logged-in home UI indicator (Menu button).
+
+    If we stay on the login form too long, assume login failed and stop early.
+    """
+    end = None if timeout_s <= 0 else time.time() + timeout_s
+    start = time.time()
+    while end is None or time.time() < end:
+        for by, value in menu_locators:
+            try:
+                return driver.find_element(by, value)
+            except Exception:
+                pass
+
+        if time.time() - start >= give_up_login_page_after_s:
+            if "login" in (driver.current_url or "") and element_exists(driver, By.CSS_SELECTOR, "form[data-testid='royal_login_form']"):
+                return None
+
+        time.sleep(0.2)
+    return None
+
+
 def click_cookie_banners(driver):
     # Best-effort: banner text varies by region/language.
     xpaths = [
@@ -287,16 +319,16 @@ def main(argv: list[str]) -> int:
                 menu_locators.append((By.XPATH, f"//*[@role='button' and @aria-label={xpath_literal(label)}]"))
             menu_locators.extend(sel.HOME_MENU_BUTTON)
 
-            try:
-                menu_btn = find_first(driver, menu_locators, timeout_s=args.home_timeout)
-                expanded = (menu_btn.get_attribute("aria-expanded") or "").lower()
-                if expanded != "true":
-                    safe_click(driver, menu_btn)
-            except RuntimeError:
+            menu_btn = wait_for_home_menu(driver, menu_locators, timeout_s=args.home_timeout)
+            if menu_btn is None:
                 print(
                     "Home menu button not found (still on checkpoint/robot detection?).",
                     file=sys.stderr,
                 )
+            else:
+                expanded = (menu_btn.get_attribute("aria-expanded") or "").lower()
+                if expanded != "true":
+                    safe_click(driver, menu_btn)
 
         if args.screenshot_after:
             args.screenshot_after.parent.mkdir(parents=True, exist_ok=True)
