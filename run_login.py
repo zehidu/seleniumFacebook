@@ -11,21 +11,43 @@ from typing import Optional
 
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import StaleElementReferenceException
 from selenium.webdriver.chrome.options import Options as ChromeOptions
+from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
 import fb_selectors as sel
 
 
-def find_first(driver, locators: list[tuple[str, str]], timeout_s: float = 20.0):
+def find_first(
+    driver,
+    locators: list[tuple[str, str]],
+    timeout_s: float = 20.0,
+    *,
+    require_displayed: bool = True,
+):
     """Try multiple locators until one matches (polling)."""
     end = None if timeout_s <= 0 else time.time() + timeout_s
     last_exc: Optional[Exception] = None
     while end is None or time.time() < end:
         for by, value in locators:
             try:
-                return driver.find_element(by, value)
+                els = driver.find_elements(by, value)
+                if not els:
+                    continue
+                if not require_displayed:
+                    return els[0]
+
+                for el in els:
+                    try:
+                        if el.is_displayed():
+                            return el
+                    except StaleElementReferenceException:
+                        continue
+                    except Exception as exc:
+                        last_exc = exc
+                        continue
             except Exception as exc:
                 last_exc = exc
         time.sleep(0.2)
@@ -58,6 +80,12 @@ def safe_click(driver, el) -> bool:
 
     try:
         el.click()
+        return True
+    except Exception:
+        pass
+
+    try:
+        ActionChains(driver).move_to_element(el).pause(0.05).click(el).perform()
         return True
     except Exception:
         pass
@@ -198,6 +226,61 @@ def wait_for_url_contains(driver, substring: str, timeout_s: float) -> bool:
             return True
         time.sleep(0.2)
     return False
+
+
+def click_marketplace(driver, *, label: str, timeout_s: float) -> bool:
+    """Try to click Marketplace (from the Menu) with multiple strategies."""
+    if "/marketplace" in (driver.current_url or ""):
+        return True
+
+    mp_locators: list[tuple[str, str]] = []
+    if label:
+        # Some UIs place the label in a span.
+        mp_locators.append((By.XPATH, f"//span[normalize-space()={xpath_literal(label)}]"))
+
+        # Try closest clickable-ish ancestor.
+        mp_locators.append(
+            (
+                By.XPATH,
+                f"//span[normalize-space()={xpath_literal(label)}]"
+                f"/ancestor-or-self::*[self::a or @role='link' or @role='button' or @tabindex][1]",
+            )
+        )
+
+    mp_locators.extend(sel.MARKETPLACE_ENTRY)
+
+    try:
+        mp_el = find_first(driver, mp_locators, timeout_s=timeout_s, require_displayed=True)
+    except RuntimeError:
+        mp_el = None
+
+    if mp_el is not None:
+        if safe_click(driver, mp_el) and wait_for_url_contains(driver, "/marketplace", timeout_s=10.0):
+            return True
+
+    # If we found the text but click didn't navigate, try clicking ancestors up the tree.
+    if label:
+        try:
+            text_el = find_first(
+                driver,
+                [(By.XPATH, f"//span[normalize-space()={xpath_literal(label)}]")],
+                timeout_s=2.0,
+                require_displayed=True,
+            )
+        except RuntimeError:
+            text_el = None
+
+        if text_el is not None:
+            cur = text_el
+            for _ in range(8):
+                if safe_click(driver, cur) and wait_for_url_contains(driver, "/marketplace", timeout_s=3.0):
+                    return True
+                try:
+                    cur = cur.find_element(By.XPATH, "..")
+                except Exception:
+                    break
+
+    return "/marketplace" in (driver.current_url or "")
 
 
 def load_credentials(args) -> tuple[str, str]:
@@ -375,23 +458,11 @@ def main(argv: list[str]) -> int:
                     # If menu is opened, click "Marketplace".
                     if "/marketplace" not in (driver.current_url or ""):
                         mp_label = (args.marketplace_label or "").strip()
-                        mp_locators = []
-                        if mp_label:
-                            mp_locators.append(
-                                (
-                                    By.XPATH,
-                                    f"//span[normalize-space()={xpath_literal(mp_label)}]"
-                                    f"/ancestor::*[self::a or @role='link' or @role='button'][1]",
-                                )
+                        if not click_marketplace(driver, label=mp_label, timeout_s=args.marketplace_timeout):
+                            print(
+                                "Marketplace click did not navigate (selector mismatch or UI changed).",
+                                file=sys.stderr,
                             )
-                        mp_locators.extend(sel.MARKETPLACE_ENTRY)
-
-                        try:
-                            mp_el = find_first(driver, mp_locators, timeout_s=args.marketplace_timeout)
-                            safe_click(driver, mp_el)
-                            wait_for_url_contains(driver, "/marketplace", timeout_s=10.0)
-                        except RuntimeError:
-                            print("Marketplace entry not found in Menu.", file=sys.stderr)
 
         if args.screenshot_after:
             args.screenshot_after.parent.mkdir(parents=True, exist_ok=True)

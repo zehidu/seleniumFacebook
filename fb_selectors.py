@@ -37,6 +37,9 @@ HOME_MENU_BUTTON = [
 ]
 
 MARKETPLACE_ENTRY = [
+    # Top nav / shortcuts often have aria-label.
+    (By.CSS_SELECTOR, "[role='link'][aria-label='Marketplace']"),
+    (By.CSS_SELECTOR, "a[aria-label='Marketplace']"),
     # Prefer href-based matches (more stable than classes).
     (By.CSS_SELECTOR, "a[href*='/marketplace']"),
     (By.CSS_SELECTOR, "a[href*='facebook.com/marketplace']"),
