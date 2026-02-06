@@ -189,6 +189,17 @@ def wait_for_post_login(driver, initial_url: str, timeout_s: float):
     return False
 
 
+def wait_for_url_contains(driver, substring: str, timeout_s: float) -> bool:
+    if not substring:
+        return False
+    end = time.time() + timeout_s
+    while time.time() < end:
+        if substring in (driver.current_url or ""):
+            return True
+        time.sleep(0.2)
+    return False
+
+
 def load_credentials(args) -> tuple[str, str]:
     email = os.environ.get("FB_EMAIL", "").strip()
     password = os.environ.get("FB_PASSWORD", "")
@@ -233,6 +244,17 @@ def main(argv: list[str]) -> int:
         default="Menu",
         help="aria-label for the home menu button (locale dependent). Default: Menu",
     )
+    ap.add_argument(
+        "--marketplace-label",
+        default="Marketplace",
+        help="Visible label for Marketplace entry (locale dependent). Default: Marketplace",
+    )
+    ap.add_argument(
+        "--marketplace-timeout",
+        type=float,
+        default=30.0,
+        help="Wait timeout for Marketplace entry after the menu is opened (seconds)",
+    )
     ap.add_argument("--email", help="Email/phone (prefer env var FB_EMAIL)")
     ap.add_argument(
         "--password",
@@ -253,6 +275,21 @@ def main(argv: list[str]) -> int:
         action="store_false",
         default=None,
         help="Do not click the home Menu button",
+    )
+    mp_group = ap.add_mutually_exclusive_group()
+    mp_group.add_argument(
+        "--open-marketplace",
+        dest="open_marketplace",
+        action="store_true",
+        default=None,
+        help="Click Marketplace entry after opening Menu (default)",
+    )
+    mp_group.add_argument(
+        "--no-open-marketplace",
+        dest="open_marketplace",
+        action="store_false",
+        default=None,
+        help="Do not click Marketplace",
     )
     keep_group = ap.add_mutually_exclusive_group()
     keep_group.add_argument(
@@ -279,6 +316,10 @@ def main(argv: list[str]) -> int:
     open_menu = args.open_menu
     if open_menu is None:
         open_menu = True
+
+    open_marketplace = args.open_marketplace
+    if open_marketplace is None:
+        open_marketplace = True
 
     email, password = load_credentials(args)
     if not email or not password:
@@ -329,6 +370,28 @@ def main(argv: list[str]) -> int:
                 expanded = (menu_btn.get_attribute("aria-expanded") or "").lower()
                 if expanded != "true":
                     safe_click(driver, menu_btn)
+
+                if open_marketplace:
+                    # If menu is opened, click "Marketplace".
+                    if "/marketplace" not in (driver.current_url or ""):
+                        mp_label = (args.marketplace_label or "").strip()
+                        mp_locators = []
+                        if mp_label:
+                            mp_locators.append(
+                                (
+                                    By.XPATH,
+                                    f"//span[normalize-space()={xpath_literal(mp_label)}]"
+                                    f"/ancestor::*[self::a or @role='link' or @role='button'][1]",
+                                )
+                            )
+                        mp_locators.extend(sel.MARKETPLACE_ENTRY)
+
+                        try:
+                            mp_el = find_first(driver, mp_locators, timeout_s=args.marketplace_timeout)
+                            safe_click(driver, mp_el)
+                            wait_for_url_contains(driver, "/marketplace", timeout_s=10.0)
+                        except RuntimeError:
+                            print("Marketplace entry not found in Menu.", file=sys.stderr)
 
         if args.screenshot_after:
             args.screenshot_after.parent.mkdir(parents=True, exist_ok=True)

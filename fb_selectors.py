@@ -35,3 +35,12 @@ HOME_MENU_BUTTON = [
     (By.CSS_SELECTOR, "div[role='button'][aria-label='Menu']"),
     (By.XPATH, "//*[@role='button' and @aria-label='Menu']"),
 ]
+
+MARKETPLACE_ENTRY = [
+    # Prefer href-based matches (more stable than classes).
+    (By.CSS_SELECTOR, "a[href*='/marketplace']"),
+    (By.CSS_SELECTOR, "a[href*='facebook.com/marketplace']"),
+    (By.XPATH, "//a[contains(@href, '/marketplace') or contains(@href, 'facebook.com/marketplace')]"),
+    # Fallback: locate by visible text.
+    (By.XPATH, "//span[normalize-space()='Marketplace']/ancestor::*[self::a or @role='link' or @role='button'][1]"),
+]
